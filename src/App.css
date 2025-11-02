@@ -1,0 +1,170 @@
+/* === Global design tokens =============================================== */
+:root{
+  --bg: #111;
+  --card: #1b1b1b;
+  --text: #e9e9e9;
+  --muted: #9aa0a6;
+
+  --primary: #4f8cff;
+  --danger: #ff5d5d;
+  --border: #2a2a2a;
+
+  --radius: 12px;
+  --shadow: 0 8px 24px rgba(0,0,0,.35);
+
+  --sp-1: .25rem;
+  --sp-2: .5rem;
+  --sp-3: .75rem;
+  --sp-4: 1rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
+}
+
+*{ box-sizing: border-box }
+html,body,#root{ height:100% }
+body{
+  margin:0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* Center page content */
+#root{ max-width: 840px; margin:0 auto; padding: var(--sp-8) var(--sp-4) }
+
+/* === Reusable containers ================================================= */
+.container{ max-width: 760px; margin: 0 auto; padding: var(--sp-8) var(--sp-4) }
+.card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--sp-6);
+}
+
+/* Stacks & helpers */
+.hstack{ display:flex; align-items:center; gap: var(--sp-3) }
+.vstack{ display:flex; flex-direction:column; gap: var(--sp-4) }
+.toolbar{ display:flex; gap: var(--sp-3); align-items:center; flex-wrap:wrap }
+.section{ margin-top: var(--sp-8) }
+.muted{ color: var(--muted) }
+
+/* === Inputs ============================================================= */
+input[type="text"], input:not([type]){
+  background:#0f0f0f;
+  border:1px solid var(--border);
+  color:var(--text);
+  border-radius:10px;
+  padding:.6rem .8rem;
+  outline:none;
+  width:100%;
+}
+input:focus{
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79,140,255,.15);
+}
+label{ display:inline-flex; align-items:center; gap:.5rem }
+input[type="checkbox"]{ width:1rem; height:1rem; accent-color: var(--primary) }
+
+/* === Buttons ============================================================ */
+button{ font: inherit }
+.btn{
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:.55rem .9rem;
+  background:#141414;
+  color:var(--text);
+  cursor:pointer;
+  transition: .15s ease-in-out;
+}
+.btn:hover{ transform: translateY(-1px) }
+.btn:disabled{ opacity:.55; cursor:not-allowed; transform:none }
+
+.btn--primary{ background: var(--primary); border-color: transparent; color:#fff }
+.btn--danger{ background: var(--danger); border-color: transparent; color:#fff }
+.btn--ghost{ background:transparent }
+
+/* === Shopping list rows ================================================ */
+.list{ display:flex; flex-direction:column; gap: var(--sp-2) }
+.list-row{
+  display:grid;
+  grid-template-columns: 24px 1fr auto auto;
+  gap: var(--sp-3);
+  align-items:center;
+  padding: .4rem .5rem;
+  border:1px solid var(--border);
+  border-radius:10px;
+}
+.list-name.done{ color: var(--muted); text-decoration: line-through }
+
+/* === Simple table (members) ============================================ */
+.table{ width:100%; border-collapse: collapse; border:1px solid var(--border); border-radius:10px; overflow:hidden }
+.table th,.table td{ padding:.65rem .8rem; border-bottom:1px solid var(--border); text-align:left }
+.table tr:last-child td{ border-bottom:none }
+.table th{ color: var(--muted); font-weight:600 }
+
+/* === Modals ============================================================= */
+.modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.5); display:grid; place-items:center; z-index:1000 }
+.modal{ background: var(--card); border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); width:min(520px, 92vw); padding: var(--sp-6) }
+.modal-footer{ display:flex; justify-content:flex-end; gap: var(--sp-3); margin-top: var(--sp-4) }
+
+/* Srovnání řádku položky */
+.list-row {
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.list-row:last-child { border-bottom: none; }
+
+/* Skupina input + tlačítko */
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+.input-group > .input {
+  flex: 1;
+}
+
+/* Jemnější checkbox zarovnání */
+.checkbox {
+  width: 18px;
+  height: 18px;
+}
+
+/* Stav hotovo */
+.list-name.done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.list-row.done .btn:not(.btn--ghost) {
+  opacity: .7;
+}
+
+/* Badge pro roli */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.badge--owner {
+  border-color: #8bd17c33;
+  background: #8bd17c11;
+  color: #a4e08f;
+}
+.badge--member {
+  border-color: #61dafb33;
+  background: #61dafb11;
+  color: #9fe4fb;
+}
+
+/* Lepší hover/focus na tlačítkách */
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn:focus-visible {
+  outline: 2px solid #61dafb;
+  outline-offset: 2px;
+}
