@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import ListHeader from "../components/ListHeader";
 import ItemNewForm from "../components/ItemNewForm";
 import ItemFilters from "../components/ItemFilters";
@@ -6,71 +6,116 @@ import ItemList from "../components/ItemList";
 import RenameListModal from "../components/RenameListModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 
-/** --- Inicializační data uložená na úrovni route  */
-const INITIAL = {
-  currentUserId: "u1", // změň na "u1", pokud chceš testovat roli ownera
-  list: {
-    id: "list-1",
-    title: "Nákup na víkend",
-    archived: false,
-    ownerId: "u1",
-    items: [
-      { id: "i1", name: "Mléko 2×", done: false },
-      { id: "i2", name: "Rohlíky 10×", done: true },
-      { id: "i3", name: "Máslo", done: false },
-      { id: "i4", name: "Pepř", done: false },
-    ],
-    members: [
-      { id: "u1", name: "Owner", role: "OWNER" },
-      { id: "u2", name: "Michal", role: "MEMBER" },
-    ],
-  },
-};
+export default function ListDetailPage({ state, setState, id, onBack }) {
+  // Najdi list podle ID z globálního (perzistentního) stavu
+  const baseList = useMemo(
+    () => state.lists.find((l) => l.id === id),
+    [state.lists, id]
+  );
 
-export default function ListDetailPage() {
-  const [title, setTitle] = useState(INITIAL.list.title);
-  const [archived, setArchived] = useState(INITIAL.list.archived);
-  const [items, setItems] = useState(INITIAL.list.items);
-  const [members, setMembers] = useState(INITIAL.list.members);
+  // Když ID neexistuje, přesměruj až po renderu
+  useEffect(() => {
+    if (!baseList) onBack?.();
+  }, [baseList, onBack]);
+
+  if (!baseList) return null;
+
+  const currentUserId = state.currentUserId;
+  const isOwner = baseList.ownerId === currentUserId;
+
+  // Safe fallbacks to avoid undefined arrays from older data
+  const items = Array.isArray(baseList?.items) ? baseList.items : [];
+  const members = Array.isArray(baseList?.members) ? baseList.members : [];
+
+  // Toggle sekce "Členové" (rozbalit/schovat) + automatický scroll při otevření
+  const [showMembers, setShowMembers] = useState(false);
+  const membersRef = useRef(null);
+  useEffect(() => {
+    if (showMembers && membersRef.current) {
+      membersRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [showMembers]);
+
+  // UI-only stavy
   const [showDone, setShowDone] = useState(false); // default: jen nevyřešené
-
-  // modaly
   const [renameOpen, setRenameOpen] = useState(false);
   const [confirm, setConfirm] = useState(null); // { text, onConfirm }
-
-  const isOwner = useMemo(
-    () => INITIAL.currentUserId === INITIAL.list.ownerId,
-    []
-  );
 
   /** -------- Handlery: položky -------- */
   const handleAddItem = (payload) => {
     const text = payload?.name?.trim();
-    if (!text || archived) return;
-    setItems((prev) => [
+    if (!text || baseList.archived) return;
+
+    const item = {
+      id:
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `i_${Date.now().toString(36)}`,
+      name: text,
+      done: false,
+    };
+
+    setState((prev) => ({
       ...prev,
-      { id: crypto.randomUUID(), name: text, done: false },
-    ]);
+      lists: prev.lists.map((l) => {
+        if (l.id !== id) return l;
+        const prevItems = Array.isArray(l.items) ? l.items : [];
+        const nextItems = [...prevItems, item];
+        const itemsCount = nextItems.length;
+        const doneCount = nextItems.filter((x) => x.done).length;
+        return { ...l, items: nextItems, itemsCount, doneCount };
+      }),
+    }));
   };
 
-  const handleToggleDone = (id, next) => {
-    if (archived) return;
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, done: next } : it)));
+  const handleToggleDone = (itemId, next) => {
+    if (baseList.archived) return;
+    setState((prev) => ({
+      ...prev,
+      lists: prev.lists.map((l) => {
+        if (l.id !== id) return l;
+        const prevItems = Array.isArray(l.items) ? l.items : [];
+        const nextItems = prevItems.map((it) => (it.id === itemId ? { ...it, done: next } : it));
+        const doneCount = nextItems.filter((it) => it.done).length;
+        return { ...l, items: nextItems, doneCount };
+      }),
+    }));
   };
 
-  const handleEditItem = (id, name) => {
-    if (archived) return;
-    const text = name.trim();
+  const handleEditItem = (itemId, name) => {
+    if (baseList.archived) return;
+    const text = (name || "").trim();
     if (!text) return;
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, name: text } : it)));
+    setState((prev) => ({
+      ...prev,
+      lists: prev.lists.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              items: (Array.isArray(l.items) ? l.items : []).map((it) =>
+                it.id === itemId ? { ...it, name: text } : it
+              ),
+            }
+          : l
+      ),
+    }));
   };
 
-  const handleRemoveItem = (id) => {
-    if (archived) return;
+  const handleRemoveItem = (itemId) => {
+    if (baseList.archived) return;
     setConfirm({
       text: "Smazat položku ze seznamu?",
       onConfirm: () => {
-        setItems((prev) => prev.filter((it) => it.id !== id));
+        setState((prev) => ({
+          ...prev,
+          lists: prev.lists.map((l) => {
+            if (l.id !== id) return l;
+            const prevItems = Array.isArray(l.items) ? l.items : [];
+            const nextItems = prevItems.filter((it) => it.id !== itemId);
+            const doneCount = nextItems.filter((it) => it.done).length;
+            return { ...l, items: nextItems, itemsCount: nextItems.length, doneCount };
+          }),
+        }));
         setConfirm(null);
       },
     });
@@ -81,13 +126,19 @@ export default function ListDetailPage() {
     if (!isOwner) return;
     const next = (newName || "").trim();
     if (!next) return;
-    setTitle(next);
+    setState((prev) => ({
+      ...prev,
+      lists: prev.lists.map((l) => (l.id === id ? { ...l, title: next, name: next } : l)),
+    }));
     setRenameOpen(false);
   };
 
   const handleArchiveToggle = (next) => {
     if (!isOwner) return;
-    setArchived(!!next);
+    setState((prev) => ({
+      ...prev,
+      lists: prev.lists.map((l) => (l.id === id ? { ...l, archived: !!next } : l)),
+    }));
   };
 
   const handleDeleteList = () => {
@@ -95,51 +146,86 @@ export default function ListDetailPage() {
     setConfirm({
       text: "Opravdu smazat tento nákupní seznam?",
       onConfirm: () => {
-        setItems([]);
-        setMembers((m) => m.filter(() => false));
+        setState((prev) => ({
+          ...prev,
+          lists: prev.lists.filter((l) => l.id !== id),
+        }));
         setConfirm(null);
+        onBack?.();
       },
     });
   };
 
   /** -------- Handlery: členové -------- */
   const handleInviteMember = (payload) => {
-    if (!isOwner || archived) return;
+    if (!isOwner || baseList.archived) return;
     const name = (payload?.user || "").trim();
     if (!name) return;
-    setMembers((prev) => [
+    const member = {
+      id:
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `u_${Date.now().toString(36)}`,
+      name,
+      role: "MEMBER",
+    };
+    setState((prev) => ({
       ...prev,
-      { id: crypto.randomUUID(), name, role: "MEMBER" },
-    ]);
+      lists: prev.lists.map((l) =>
+        l.id === id
+          ? { ...l, members: [...(Array.isArray(l.members) ? l.members : []), member] }
+          : l
+      ),
+    }));
   };
 
   const handleRemoveMember = (userId) => {
-    if (!isOwner || archived) return;
-    if (userId === INITIAL.list.ownerId) return; // ownera neodstraňuj
+    if (!isOwner || baseList.archived) return;
+    if (userId === baseList.ownerId) return; // ownera neodstraňuj
     setConfirm({
       text: "Odebrat člena ze seznamu?",
       onConfirm: () => {
-        setMembers((prev) => prev.filter((m) => m.id !== userId));
+        setState((prev) => ({
+          ...prev,
+          lists: prev.lists.map((l) =>
+            l.id === id
+              ? {
+                  ...l,
+                  members: (Array.isArray(l.members) ? l.members : []).filter((m) => m.id !== userId),
+                }
+              : l
+          ),
+        }));
         setConfirm(null);
       },
     });
   };
 
   const handleLeave = () => {
-    const amIOwner = isOwner; // čitelněji
-    if (amIOwner || archived) return; // owner nemůže odejít, ani v archivu
+    if (isOwner || baseList.archived) return; // owner nemůže odejít, ani v archivu
     setConfirm({
       text: "Opravdu chcete odejít ze seznamu?",
       onConfirm: () => {
-        setMembers((prev) => prev.filter((m) => m.id !== INITIAL.currentUserId));
+        setState((prev) => ({
+          ...prev,
+          lists: prev.lists.map((l) =>
+            l.id === id
+              ? {
+                  ...l,
+                  members: (Array.isArray(l.members) ? l.members : []).filter(
+                    (m) => m.id !== currentUserId
+                  ),
+                }
+              : l
+          ),
+        }));
         setConfirm(null);
       },
     });
   };
 
   const onOpenMembers = () => {
-    const info = document.getElementById("members-section");
-    info?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setShowMembers((prev) => !prev);
   };
 
   /** -------- Odvozeniny -------- */
@@ -148,13 +234,18 @@ export default function ListDetailPage() {
     [items, showDone]
   );
 
+  const title = baseList.title ?? baseList.name; // pro jistotu podporuj obě pole
+
   return (
     <div className="container">
+      <button onClick={onBack} style={{ marginBottom: 12 }}>
+        &larr; Zpět
+      </button>
       <div className="card vstack">
         <ListHeader
           title={title}
           isOwner={isOwner}
-          isArchived={archived}
+          isArchived={!!baseList.archived}
           onRename={() => setRenameOpen(true)}
           onArchiveToggle={handleArchiveToggle}
           onDelete={handleDeleteList}
@@ -162,24 +253,25 @@ export default function ListDetailPage() {
         />
 
         <div className="section">
-          <ItemNewForm onAdd={handleAddItem} disabled={archived} />
+          <ItemNewForm onAdd={handleAddItem} disabled={!!baseList.archived} />
           <ItemFilters showDone={showDone} onToggle={setShowDone} />
           <ItemList
             items={filteredItems}
             onToggleDone={handleToggleDone}
             onEdit={handleEditItem}
             onRemove={handleRemoveItem}
-            disabled={archived}
+            disabled={!!baseList.archived}
           />
         </div>
 
         {/* ---- Členové seznamu */}
-        <section id="members-section" className="section vstack">
+        {showMembers && (
+        <section id="members-section" ref={membersRef} className="section vstack">
           <h3>Členové</h3>
 
           {/* přidání člena – povoleno jen ownerovi */}
           {isOwner && (
-            <InlineInvite onInvite={handleInviteMember} disabled={archived} />
+            <InlineInvite onInvite={handleInviteMember} disabled={!!baseList.archived} />
           )}
 
           <table className="table" style={{ marginTop: 8 }}>
@@ -192,8 +284,8 @@ export default function ListDetailPage() {
             </thead>
             <tbody>
               {members.map((m) => {
-                const isCurrent = m.id === INITIAL.currentUserId;
-                const canRemove = isOwner && m.id !== INITIAL.list.ownerId;
+                const isCurrent = m.id === currentUserId;
+                const canRemove = isOwner && m.id !== baseList.ownerId;
                 const badgeClass = m.role === "OWNER" ? "badge badge--owner" : "badge badge--member";
                 return (
                   <tr key={m.id}>
@@ -201,7 +293,7 @@ export default function ListDetailPage() {
                     <td><span className={badgeClass}>{m.role}</span></td>
                     <td>
                       {canRemove && (
-                        <button className="btn btn--danger" disabled={archived} onClick={() => handleRemoveMember(m.id)}>
+                        <button className="btn btn--danger" disabled={!!baseList.archived} onClick={() => handleRemoveMember(m.id)}>
                           Odebrat
                         </button>
                       )}
@@ -209,7 +301,7 @@ export default function ListDetailPage() {
                         <button
                           className="btn btn--ghost"
                           style={{ marginLeft: 8 }}
-                          disabled={archived}
+                          disabled={!!baseList.archived}
                           onClick={handleLeave}
                         >
                           Odejít
@@ -222,6 +314,7 @@ export default function ListDetailPage() {
             </tbody>
           </table>
         </section>
+        )}
       </div>
 
       {/* Modaly */}

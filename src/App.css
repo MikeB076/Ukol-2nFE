@@ -7,10 +7,19 @@
 
   --primary: #4f8cff;
   --danger: #ff5d5d;
+  --primary-600:#3d76e0;
+  --danger-600:#dc3c3c;
+  --success:#22c55e;
+  --success-600:#16a34a;
+  --warning:#f59e0b;
+  --warning-600:#d97706;
+  --focus-ring: 0 0 0 3px rgba(79,140,255,.25);
+
   --border: #2a2a2a;
 
   --radius: 12px;
   --shadow: 0 8px 24px rgba(0,0,0,.35);
+  --shadow-lg: 0 16px 40px rgba(0,0,0,.45);
 
   --sp-1: .25rem;
   --sp-2: .5rem;
@@ -21,10 +30,17 @@
 }
 
 *{ box-sizing: border-box }
+*:focus-visible{ outline: var(--focus-ring); outline-offset: 2px; }
 html,body,#root{ height:100% }
 body{
   margin:0;
-  background: var(--bg);
+  /* Soft radial spotlight background */
+  background:
+    radial-gradient(1200px 800px at 50% 160px, rgba(80,90,120,.22), rgba(17,17,17,1) 60%),
+    radial-gradient(900px 600px at 80% 30%, rgba(84, 211, 142, .08), rgba(17,17,17,0) 60%),
+    radial-gradient(900px 600px at 20% 15%, rgba(56, 189, 248, .07), rgba(17,17,17,0) 60%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
@@ -76,25 +92,65 @@ button{ font: inherit }
   color:var(--text);
   cursor:pointer;
   transition: .15s ease-in-out;
+  box-shadow: 0 0 0 0 rgba(0,0,0,0);
 }
-.btn:hover{ transform: translateY(-1px) }
+.btn:hover{ transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,.25); }
 .btn:disabled{ opacity:.55; cursor:not-allowed; transform:none }
 
 .btn--primary{ background: var(--primary); border-color: transparent; color:#fff }
 .btn--danger{ background: var(--danger); border-color: transparent; color:#fff }
 .btn--ghost{ background:transparent }
+.btn--secondary{ background:#1e1e1e; color:var(--text) }
+.btn--sm{ padding:.4rem .7rem; font-size:.9rem }
+.btn--lg{ padding:.7rem 1.1rem; font-size:1rem }
+.btn-group{ display:inline-flex; gap:8px; align-items:center }
+.btn--icon{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; padding:0;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#141414;
+}
+.btn--icon:hover{ filter: brightness(1.05) }
+.btn--primary:hover{ background: var(--primary-600) }
+.btn--danger:hover{ background: var(--danger-600) }
+.btn--secondary:hover{ filter: brightness(1.05) }
+.btn--outline{ background:transparent; border-color: var(--primary); color: var(--primary) }
+.btn--outline:hover{ background: rgba(79,140,255,.08) }
+.btn--success{ background: var(--success); color:#04140a; border-color: transparent }
+.btn--success:hover{ background: var(--success-600) }
+.btn--warning{ background: var(--warning); color:#140b04; border-color: transparent }
+.btn--warning:hover{ background: var(--warning-600) }
+
+/* === Pills & hero header =============================================== */
+.pill-group{ display:flex; gap:8px; flex-wrap:wrap }
+.pill{
+  display:inline-flex; align-items:center; gap:8px; padding:.35rem .7rem;
+  border:1px solid var(--border); border-radius:999px; background:#141414; color:var(--text);
+  cursor:pointer; transition:.15s ease-in-out;
+}
+.pill:hover{ filter:brightness(1.05) }
+.pill--active{ background: var(--primary); color:#fff; border-color: transparent }
+
+.hero{
+  background: radial-gradient(1200px 400px at 50% -200px, rgba(79,140,255,.15), transparent 60%);
+  padding: var(--sp-6) var(--sp-4) var(--sp-4);
+}
+.hero h1{ margin:0 0 .25rem 0; letter-spacing:.2px }
+.hero p{ margin:0; color: var(--muted) }
 
 /* === Shopping list rows ================================================ */
 .list{ display:flex; flex-direction:column; gap: var(--sp-2) }
 .list-row{
   display:grid;
-  grid-template-columns: 24px 1fr auto auto;
+  grid-template-columns: 30px 1fr auto auto;
   gap: var(--sp-3);
   align-items:center;
-  padding: .4rem .5rem;
+  padding: .55rem .65rem;
   border:1px solid var(--border);
   border-radius:10px;
 }
+.list-row + .list-row{ margin-top:.5rem }
 .list-name.done{ color: var(--muted); text-decoration: line-through }
 
 /* === Simple table (members) ============================================ */
@@ -108,14 +164,14 @@ button{ font: inherit }
 .modal{ background: var(--card); border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); width:min(520px, 92vw); padding: var(--sp-6) }
 .modal-footer{ display:flex; justify-content:flex-end; gap: var(--sp-3); margin-top: var(--sp-4) }
 
-/* Srovnání řádku položky */
-.list-row {
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+/* Srovnání řádku položky – plochý styl použij pokud nechceš rámečky */
+.list-row--flat{
+  align-items:center;
+  gap:12px;
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
 }
-.list-row:last-child { border-bottom: none; }
+.list-row--flat:last-child{ border-bottom:none; }
 
 /* Skupina input + tlačítko */
 .input-group {
@@ -148,7 +204,7 @@ button{ font: inherit }
   font-size: 12px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: #141414;
 }
 .badge--owner {
   border-color: #8bd17c33;
@@ -160,11 +216,168 @@ button{ font: inherit }
   background: #61dafb11;
   color: #9fe4fb;
 }
+.badge--archiv{
+  border-color:#ffd16633;
+  background:#ffd16611;
+  color:#ffd166;
+  padding:2px 8px;
+  border-radius:10px;
+}
 
 /* Lepší hover/focus na tlačítkách */
-.btn:hover { transform: translateY(-1px); }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,.25); }
 .btn:active { transform: translateY(0); }
 .btn:focus-visible {
   outline: 2px solid #61dafb;
   outline-offset: 2px;
 }
+
+/* === Tiles (overview of lists) ======================================== */
+.filters{
+  display:flex;
+  gap: var(--sp-3);
+  align-items:center;
+  flex-wrap:wrap;
+  margin: var(--sp-4) 0;
+}
+
+.tiles{
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--sp-4);
+}
+
+.tile{
+  display:flex;
+  flex-direction:column;
+  gap: var(--sp-3);
+  padding: var(--sp-6);
+  background: var(--card);
+  border:1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  min-height: 170px;
+  transition: transform .15s ease, box-shadow .15s ease;
+  will-change: transform, box-shadow;
+}
+.tile:hover{
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+.tile:active{
+  transform: translateY(-1px);
+}
+.tile:focus-within{
+  outline: 2px solid rgba(79,140,255,.35);
+  outline-offset: 3px;
+}
+.tile h3{
+  margin: 0;
+  font-size: 1rem;
+}
+.tile .meta{
+  color: var(--muted);
+  font-size: .85rem;
+}
+.tile .tile-actions{
+  margin-top:auto;
+  display:flex;
+  gap: var(--sp-3);
+}
+
+/* Subtle improvements to inputs & buttons for the tile look */
+input::placeholder{ color:#6b7280 }
+.btn--ghost{ border-color: var(--border) }
+
+/* === Collapsible (used for the Members section toggle) =================== */
+.collapsible{
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height .35s ease, opacity .25s ease;
+}
+.collapsible.open{
+  max-height: 1000px; /* big enough for typical content */
+  opacity: 1;
+}
+
+/* === Progress bar (done/total) ========================================= */
+.progress{ position: relative; display:flex; align-items:center; gap:.5rem; }
+.progress__track{
+  flex:1; height:10px; border-radius:999px;
+  background:#0e1116; border:1px solid var(--border);
+  overflow:hidden
+}
+.progress__bar{ height:100%; background: linear-gradient(90deg, #54d38e, #38bdf8); transition: width .25s ease; box-shadow: inset 0 0 0 1px rgba(255,255,255,.04); }
+.progress__label{ font-size:12px; color: var(--muted) }
+
+/* === Field helpers & error state ======================================= */
+.field{ display:flex; flex-direction:column; gap:.35rem }
+.help{ font-size:12px; color: var(--muted) }
+.input--error{ border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(255,93,93,.15) }
+.help--error{ color: #ffb4b4 }
+
+/* === Optional sticky toolbar (use class `toolbar--sticky` on your toolbar) */
+.toolbar--sticky{
+  position: sticky; top: 0; z-index: 5;
+  background: var(--card);
+  backdrop-filter: blur(4px) saturate(120%);
+  border-bottom:1px solid rgba(255,255,255,.04);
+  box-shadow: 0 6px 24px rgba(0,0,0,.25);
+  padding-top: var(--sp-2);
+  margin-top: calc(-1 * var(--sp-2));
+}
+
+/* === Avatar (initials bubble) ========================================== */
+.avatar{
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #2a2a2a; color:#fff; font-weight:700;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.tag{ display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#101010 }
+.tag .dot{ width:6px; height:6px; border-radius:50%; background:currentColor }
+
+/* === Toast (lightweight notification) ================================== */
+.toast{
+  position: fixed; left:50%; bottom:16px; transform: translateX(-50%);
+  display:flex; align-items:center; gap:12px;
+  background: #171717; color: var(--text);
+  border:1px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; box-shadow: var(--shadow);
+  z-index: 2000;
+}
+.toast__action{ border:none; background:transparent; color: var(--primary); cursor:pointer }
+
+/* === Accessibility helper ============================================== */
+.visually-hidden{ position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap; }
+
+/* === Empty state ======================================================== */
+.empty-state{
+  text-align:center;
+  padding: var(--sp-8);
+  border:1px dashed var(--border);
+  border-radius: var(--radius);
+  background: #101214;
+  color: var(--muted);
+}
+.empty-state h3{ margin:0 0 .25rem 0; color: var(--text) }
+.empty-state p{ margin:.25rem 0 0 0 }
+
+/* === Reduced motion preference ========================================== */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* === Scrollbar (WebKit) ================================================ */
+*::-webkit-scrollbar{ height:12px; width:12px }
+*::-webkit-scrollbar-track{ background:#0b0b0b }
+*::-webkit-scrollbar-thumb{ background:#2b2b2b; border:3px solid #0b0b0b; border-radius:10px }
+*::-webkit-scrollbar-thumb:hover{ background:#3a3a3a }
+
+/* === Spacing utilities ================================================== */
+.mt-2{ margin-top: var(--sp-2) } .mt-4{ margin-top: var(--sp-4) } .mt-6{ margin-top: var(--sp-6) }
+.mb-2{ margin-bottom: var(--sp-2) } .mb-4{ margin-bottom: var(--sp-4) } .mb-6{ margin-bottom: var(--sp-6) }
+.gap-2{ gap: var(--sp-2) } .gap-3{ gap: var(--sp-3) } .gap-4{ gap: var(--sp-4) }
