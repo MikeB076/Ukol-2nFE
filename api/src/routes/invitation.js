@@ -14,7 +14,8 @@ r.post(
   requireRole(['OWNER']),
   validate(createDtoIn),
   (req, res) => {
-    res.json({ token: uuid(), ...req.dtoIn, status: 'PENDING', uuAppErrorMap: {} });
+    const invitation = { token: uuid(), status: 'PENDING', ...req.dtoIn };
+    res.json({ invitation, uuAppErrorMap: {} });
   }
 );
 
@@ -25,13 +26,13 @@ r.delete(
   requireRole(['OWNER']),
   validate(cancelDtoIn),
   (req, res) => {
-    res.json({ cancelled: true, dtoIn: req.dtoIn, uuAppErrorMap: {} });
+    res.json({ cancelled: true, uuAppErrorMap: {} });
   }
 );
 
 // public (no auth) → accept by token
 r.post('/accept', validate(acceptDtoIn), (req, res) => {
-  res.json({ accepted: true, dtoIn: req.dtoIn, uuAppErrorMap: {} });
+  res.json({ accepted: true, uuAppErrorMap: {} });
 });
 
 export default r;

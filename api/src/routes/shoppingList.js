@@ -12,16 +12,19 @@ r.post('/create', requireAuth, requireRole(['OWNER']), validate(createDtoIn), (r
   res
     .status(201)
     .set('Location', `/api/shoppingList/get?id=${id}`)
-    .json({ id, name: req.dtoIn.name, archived: false, uuAppErrorMap: {} });
+    .json({ list: { id, name: req.dtoIn.name, archived: false }, uuAppErrorMap: {} });
 });
 
 r.get('/get', requireAuth, requireRole(['OWNER', 'MEMBER']), validate(getDtoIn), (req,res)=>{
-  res.json({ id: req.dtoIn.id, name: 'Groceries', archived:false, uuAppErrorMap:{} });
+  res.json({ list: { id: req.dtoIn.id, name: 'Groceries', archived: false }, uuAppErrorMap: {} });
 });
 
 r.patch('/update', requireAuth, requireRole(['OWNER']), validate(updateDtoIn), (req, res) => {
-  const { id, name } = req.dtoIn;
-  res.json({ updated: true, id, name, uuAppErrorMap: {} });
+  const { id, name, archived } = req.dtoIn;
+  const list = { id };
+  if (typeof name === 'string') list.name = name;
+  if (typeof archived === 'boolean') list.archived = archived;
+  res.json({ list, uuAppErrorMap: {} });
 });
 
 r.delete('/delete', requireAuth, requireRole(['OWNER']), validate(deleteDtoIn), (req,res)=>{
@@ -29,7 +32,7 @@ r.delete('/delete', requireAuth, requireRole(['OWNER']), validate(deleteDtoIn), 
 });
 
 r.get('/listByMyAccess', requireAuth, requireRole(['OWNER', 'MEMBER']), validate(listMineDtoIn), (req, res) => {
-  const { showArchived, query } = req.dtoIn;
+  const { archived, query, pageInfo } = req.dtoIn;
 
   // Demo dataset (simulate that some lists are archived)
   const all = [
@@ -38,11 +41,18 @@ r.get('/listByMyAccess', requireAuth, requireRole(['OWNER', 'MEMBER']), validate
     { id: 'L3', name: 'Hardware',  archived: false },
   ];
 
-  const byArchive = all.filter(l => (showArchived ? true : !l.archived));
-  const q = (query || '').trim().toLowerCase();
-  const byQuery = q ? byArchive.filter(l => l.name.toLowerCase().includes(q)) : byArchive;
+  // If archived==true → include archived lists too; if false → show only non-archived
+  const byArchive = archived ? all : all.filter(l => !l.archived);
 
-  res.json({ list: byQuery, uuAppErrorMap: {} });
+  const q = (query || '').trim().toLowerCase();
+  const filtered = q ? byArchive.filter(l => l.name.toLowerCase().includes(q)) : byArchive;
+
+  const { pageIndex = 0, pageSize = 20 } = pageInfo || {};
+  const total = filtered.length;
+  const start = pageIndex * pageSize;
+  const page = filtered.slice(start, start + pageSize);
+
+  res.json({ itemList: page, pageInfo: { pageIndex, pageSize, total }, uuAppErrorMap: {} });
 });
 
 export default r;

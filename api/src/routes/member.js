@@ -19,11 +19,11 @@ r.get('/list', requireAuth, requireRole(['OWNER', 'MEMBER']), validate(memberLis
 });
 
 r.delete('/remove', requireAuth, requireRole(['OWNER']), validate(memberRemoveDtoIn), (req,res)=>{
-  res.json({ removed: true, dtoIn: req.dtoIn, uuAppErrorMap:{} });
+  res.json({ removed: true, uuAppErrorMap:{} });
 });
 
 r.post('/leave', requireAuth, requireRole(['MEMBER']), validate(memberLeaveDtoIn), (req,res)=>{
-  res.json({ left: true, dtoIn: req.dtoIn, uuAppErrorMap:{} });
+  res.json({ left: true, uuAppErrorMap:{} });
 });
 
 export default r;
