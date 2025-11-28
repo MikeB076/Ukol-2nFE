@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { fetchListsOverview, createList, deleteList } from "../api/mockApi";
 
 /** Fallback otevření detailu jedním reloadem, pokud není předán onOpen */
 function openList(id) {
@@ -7,7 +8,12 @@ function openList(id) {
 }
 
 export default function ListsPage({ state, setState, onOpen }) {
-  const { currentUserId, lists } = state;
+  // defaultně prázdné pole, ať se to nikdy neláme na undefined
+  const { currentUserId, lists = [] } = state || { currentUserId: "u1", lists: [] };
+
+  const cleanLists = useMemo(() => (lists || []).filter(Boolean), [lists]);
+
+  const [status, setStatus] = useState("pending"); // pending | ready | error
 
   // UI-only stavy
   const [showArchived, setShowArchived] = useState(false); // zobrazit i archiv
@@ -15,94 +21,218 @@ export default function ListsPage({ state, setState, onOpen }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [confirm, setConfirm] = useState(null); // {text, onConfirm}
 
-  function handleOpen(id) {
-    if (typeof onOpen === "function") onOpen(id);
-    else openList(id);
-  }
+  // Načtení seznamů z mock "serveru"
+  useEffect(() => {
+    let cancelled = false;
 
-  /** Odvozené seznamy dle filtrů */
+    setStatus("pending");
+    fetchListsOverview()
+      .then((data) => {
+        if (cancelled) return;
+        setState((prev) => ({
+          ...prev,
+          lists: data,
+        }));
+        setStatus("ready");
+      })
+      .catch((err) => {
+        console.error("Chyba při načítání seznamů:", err);
+        if (cancelled) return;
+        setStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setState]);
+
+  /** Odvozené seznamy dle filtrů – HOOKY MUSÍ BÝT NAD RETURN! */
   const filtered = useMemo(() => {
-    let out = lists || [];
+    let out = cleanLists;
     if (!showArchived) out = out.filter((l) => !l.archived);
     if (scope === "owned") out = out.filter((l) => l.ownerId === currentUserId);
     if (scope === "member") out = out.filter((l) => l.ownerId !== currentUserId);
     return out;
-  }, [lists, showArchived, scope, currentUserId]);
+  }, [cleanLists, showArchived, scope, currentUserId]);
 
   const myListsCount = useMemo(
-    () => (lists || []).filter((l) => l.ownerId === currentUserId).length,
-    [lists, currentUserId]
+    () => cleanLists.filter((l) => l.ownerId === currentUserId).length,
+    [cleanLists, currentUserId]
   );
+
   const archivedCount = useMemo(
-    () => (lists || []).filter((l) => l.archived).length,
-    [lists]
+    () => cleanLists.filter((l) => l.archived).length,
+    [cleanLists]
   );
 
   const canDelete = (list) => list.ownerId === currentUserId;
+
+  function handleOpen(id) {
+    if (typeof onOpen === "function") onOpen(id);
+    else openList(id);
+  }
 
   const handleDelete = (id) => {
     const list = lists.find((l) => l.id === id);
     if (!list || !canDelete(list)) return;
     setConfirm({
       text: `Opravdu smazat seznam „${list.name}“?`,
-      onConfirm: () => {
-        setState((prev) => ({
-          ...prev,
-          lists: prev.lists.filter((l) => l.id !== id),
-        }));
-        setConfirm(null);
+      onConfirm: async () => {
+        try {
+          await deleteList(id);
+          // po úspěšném smazání načteme přehled z mock API
+          const updated = await fetchListsOverview();
+          setState((prev) => ({
+            ...prev,
+            lists: updated,
+          }));
+        } catch (e) {
+          console.error("Chyba při mazání seznamu:", e);
+          alert("Seznam se nepodařilo smazat. Zkuste to prosím znovu.");
+        } finally {
+          setConfirm(null);
+        }
       },
     });
   };
 
-  const handleCreate = (payload) => {
-    const name = (payload?.name || "").trim();
-    if (!name) return;
-    const id =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `l_${Date.now().toString(36)}`;
+  const handleCreate = async (payload) => {
+  console.log("handleCreate called with payload:", payload); // DEBUG
 
-    setState((prev) => ({
-      ...prev,
-      lists: [
-        {
-          id,
-          name,
-          archived: false,
-          ownerId: currentUserId,
-          itemsCount: 0,
-          doneCount: 0,
-          items: [],
-        },
-        ...prev.lists,
-      ],
-    }));
+  const name = (payload?.name || "").trim();
+  if (!name) return;
+
+  try {
+    // 1) zavoláme mock API
+    const result = await createList(name, currentUserId);
+    console.log("createList result:", result); // DEBUG
+
+    let nextLists = null;
+
+    // a) API nám vrátí rovnou CELÝ přehled seznamů
+    if (Array.isArray(result)) {
+      nextLists = result;
+    }
+    // b) API vrátí jen NOVÝ seznam (objekt)
+    else if (result && typeof result === "object") {
+      setState((prev) => {
+        const base = Array.isArray(prev.lists) ? prev.lists.filter(Boolean) : [];
+        const idx = base.findIndex((l) => l.id === result.id);
+        if (idx >= 0) {
+          base[idx] = result;
+        } else {
+          base.unshift(result);
+        }
+        console.log("lists after merge:", base); // DEBUG
+        return { ...prev, lists: base };
+      });
+    }
+
+    // c) Pokud jsme zatím `nextLists` neurčili, zkusíme načíst přehled znovu z API
+    if (!nextLists) {
+      const updated = await fetchListsOverview();
+      console.log("fetchListsOverview after create:", updated); // DEBUG
+      if (Array.isArray(updated)) {
+        nextLists = updated;
+      }
+    }
+
+    // d) Pokud máme nextLists jako pole, uložíme ho do globálního stavu
+    if (Array.isArray(nextLists)) {
+      setState((prev) => ({
+        ...prev,
+        lists: nextLists.filter(Boolean),
+      }));
+    }
+
     setCreateOpen(false);
-  };
+  } catch (e) {
+    console.error("Chyba při vytváření seznamu:", e);
+    alert("Seznam se nepodařilo vytvořit. Zkuste to prosím znovu.");
+  }
+};
 
-  /** UI */
+  // ----- RENDER PODLE STAVU -----
+
+  if (status === "pending") {
+    return (
+      <div style={{ maxWidth: 980, margin: "32px auto", padding: "0 16px" }}>
+        <div className="alert alert--info">
+          <p>Načítám nákupní seznamy…</p>
+          <p className="alert__detail">
+            Prosím čekejte, data se načítají z mock serveru.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div style={{ maxWidth: 980, margin: "32px auto", padding: "0 16px" }}>
+        <div className="alert alert--error">
+          <p>Nepodařilo se načíst nákupní seznamy.</p>
+          <p className="alert__detail">
+            Zkuste to prosím znovu později nebo obnovte stránku.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /** UI pro ready stav */
   return (
     <div style={{ maxWidth: 980, margin: "32px auto", padding: "0 16px" }}>
       {/* Hero */}
-      <header style={{ display: "flex", alignItems: "end", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+      <header
+        style={{
+          display: "flex",
+          alignItems: "end",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
         <div>
           <h1 style={{ margin: 0, fontSize: 26 }}>Moje nákupní seznamy</h1>
-          <p style={{ margin: "6px 0 0", opacity: .7, fontSize: 14 }}>
+          <p style={{ margin: "6px 0 0", opacity: 0.7, fontSize: 14 }}>
             Spravuj seznamy, sdílej s členy a sleduj progres.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn btn--secondary" onClick={() => alert("Demo: import…")}>Importovat</button>
-          <button className="btn btn--primary" onClick={() => setCreateOpen(true)}>+ Nový seznam</button>
+          <button
+            className="btn btn--primary"
+            onClick={() => setCreateOpen(true)}
+          >
+            + Nový seznam
+          </button>
         </div>
       </header>
 
       {/* Quick stats */}
-      <ul style={{ display: "flex", flexWrap: "wrap", gap: "1rem", margin: "0 0 10px", color: "var(--muted, #aaa)" }}>
-        <li>Celkem: <strong style={{ color: "var(--text, #fff)" }}>{lists.length}</strong></li>
-        <li>Moje: <strong style={{ color: "var(--text, #fff)" }}>{myListsCount}</strong></li>
-        <li>Archiv: <strong style={{ color: "var(--text, #fff)" }}>{archivedCount}</strong></li>
+      <ul
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "1rem",
+          margin: "0 0 10px",
+          color: "var(--muted, #aaa)",
+        }}
+      >
+        <li>
+          Celkem:{" "}
+          <strong style={{ color: "var(--text, #fff)" }}>{cleanLists.length}</strong>
+        </li>
+        <li>
+          Moje:{" "}
+          <strong style={{ color: "var(--text, #fff)" }}>{myListsCount}</strong>
+        </li>
+        <li>
+          Archiv:{" "}
+          <strong style={{ color: "var(--text, #fff)" }}>
+            {archivedCount}
+          </strong>
+        </li>
       </ul>
 
       {/* Toolbar s filtry (pills) */}
@@ -119,7 +249,14 @@ export default function ListsPage({ state, setState, onOpen }) {
           ))}
         </div>
 
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            marginLeft: "auto",
+          }}
+        >
           <input
             type="checkbox"
             checked={showArchived}
@@ -146,9 +283,16 @@ export default function ListsPage({ state, setState, onOpen }) {
         {filtered.length === 0 && (
           <div style={emptyStyle} className="card">
             <h3 style={{ margin: "0 0 6px" }}>Žádné seznamy</h3>
-            <p style={{ margin: 0, opacity: .7 }}>Změň filtr nebo založ nový seznam.</p>
+            <p style={{ margin: 0, opacity: 0.7 }}>
+              Změň filtr nebo založ nový seznam.
+            </p>
             <div style={{ marginTop: 12 }}>
-              <button className="btn btn--primary" onClick={() => setCreateOpen(true)}>Vytvořit první seznam</button>
+              <button
+                className="btn btn--primary"
+                onClick={() => setCreateOpen(true)}
+              >
+                Vytvořit první seznam
+              </button>
             </div>
           </div>
         )}
@@ -190,17 +334,39 @@ function TilesGrid({ children }) {
 }
 
 /** --- Jedna dlaždice s avatarem a progresem */
-function ListTile({ name, owner, itemsCount, doneCount, archived, onOpen, onDelete }) {
+function ListTile({
+  name,
+  owner,
+  itemsCount,
+  doneCount,
+  archived,
+  onOpen,
+  onDelete,
+}) {
   const first = (name?.[0] || "S").toUpperCase();
-  const ratio = itemsCount ? Math.min(100, Math.round((doneCount / itemsCount) * 100)) : 0;
+  const ratio = itemsCount
+    ? Math.min(100, Math.round((doneCount / itemsCount) * 100))
+    : 0;
 
   return (
     <article style={tileStyle} className="tile tile--accent">
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={avatarStyle}>{first}</div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <h3 style={{ margin: 0, fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</h3>
-          <div style={{ opacity: .75, fontSize: 13, marginTop: 2 }}>Owner: {owner}</div>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 16,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {name}
+          </h3>
+          <div style={{ opacity: 0.75, fontSize: 13, marginTop: 2 }}>
+            Owner: {owner}
+          </div>
         </div>
         {archived && <span style={badgeStyle}>ARCHIV</span>}
       </div>
@@ -209,16 +375,32 @@ function ListTile({ name, owner, itemsCount, doneCount, archived, onOpen, onDele
         <div style={progressTrackStyle}>
           <div style={{ ...progressBarStyle, width: `${ratio}%` }} />
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 12, opacity: .8 }}>
-          <span>Hotovo {doneCount}/{itemsCount}</span>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: 4,
+            fontSize: 12,
+            opacity: 0.8,
+          }}
+        >
+          <span>
+            Hotovo {doneCount}/{itemsCount}
+          </span>
           <span>{ratio}%</span>
         </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button className="btn btn--ghost" onClick={onOpen}>Otevřít</button>
+        <button className="btn btn--ghost" onClick={onOpen}>
+          Otevřít
+        </button>
         {onDelete && (
-          <button className="btn btn--danger" style={{ marginLeft: "auto" }} onClick={onDelete}>
+          <button
+            className="btn btn--danger"
+            style={{ marginLeft: "auto" }}
+            onClick={onDelete}
+          >
             Smazat
           </button>
         )}
@@ -257,7 +439,7 @@ function CreateListModal({ isOpen, onClose, onCreate }) {
   );
 }
 
-/** --- Stylové objekty (inline kvůli jednoduché integraci) */
+/** --- Stylové objekty (inline kvůli jednoduché integrace) */
 const toolbarStyle = {
   position: "sticky",
   top: 0,
@@ -302,7 +484,8 @@ const avatarStyle = {
   width: 36,
   height: 36,
   borderRadius: "50%",
-  background: "linear-gradient(135deg, rgba(79,140,255,.35), rgba(79,140,255,.15))",
+  background:
+    "linear-gradient(135deg, rgba(79,140,255,.35), rgba(79,140,255,.15))",
   display: "grid",
   placeItems: "center",
   fontWeight: 700,
