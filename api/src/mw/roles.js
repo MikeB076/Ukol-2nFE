@@ -1,24 +1,31 @@
 // api/src/mw/roles.js
+
 import { errorMap } from './errorMap.js';
 
-// Usage: requireRole(['OWNER','MEMBER'])
-// Reads role from header `x-role` and compares case-insensitively
-export const requireRole = (allowed = []) => (req, _res, next) => {
-  if (!Array.isArray(allowed) || allowed.length === 0) return next();
-
-  const raw = req.header('x-role');
-  const role = raw ? String(raw).trim().toUpperCase() : '';
-  const allow = allowed.map(r => String(r).trim().toUpperCase());
-
-  if (!role || !allow.includes(role)) {
-    return next(
-      errorMap(
-        'api/Forbidden',
-        `Required role: ${allowed.join(', ')}`,
-        { required: allow, provided: role || null },
-        403
-      )
-    );
-  }
-  next();
+// jednoduchá hard-coded mapa rolí podle uuIdentity
+const roleByUser = {
+  '0000-1111': ['OWNER'],          // náš „demo“ OWNER
+  '2222-3333': ['MEMBER'],         // příklad člena
 };
+
+export function requireRole(requiredRoles = []) {
+  return (req, res, next) => {
+    const user = req.user || {};
+    const roles = roleByUser[user.uuIdentity] || [];
+
+    // pokud žádná z requiredRoles není v roles → 403
+    const ok = requiredRoles.some((r) => roles.includes(r));
+    if (!ok) {
+      return next(
+        errorMap('api/Forbidden', 'Required role: ' + requiredRoles.join(' OR '), {
+          required: requiredRoles,
+          provided: roles.length ? roles : null,
+        }, 403)
+      );
+    }
+
+    // role prošly
+    req.roles = roles;
+    next();
+  };
+}

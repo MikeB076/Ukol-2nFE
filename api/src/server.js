@@ -1,3 +1,4 @@
+import { connectDb } from "./db.js";
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -36,4 +37,14 @@ app.use((err,req,res,next)=>{
 });
 
 const port = process.env.PORT || 4000;
-app.listen(port, () => console.log(`API on http://localhost:${port}`));
+
+connectDb()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`API on http://localhost:${port}`);
+    });
+  })
+  .catch((err) => {
+    console.error("❌ Failed to start server:", err);
+    process.exit(1);
+  });

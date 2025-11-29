@@ -16,13 +16,13 @@ export const createDtoIn = Joi.object({
   name: Joi.string().min(1).required(),
 });
 
-// PATCH item/update — rename only (done is handled by item/setCompleted)
+// PATCH item/update
 export const updateDtoIn = Joi.object({
   id: Joi.string().required(),
   name: Joi.string().min(1).optional(),
+  done: Joi.boolean().optional(),
 });
 
-// PATCH item/setCompleted
 export const setCompletedDtoIn = Joi.object({
   id: Joi.string().required(),
   done: Joi.boolean().required(),
