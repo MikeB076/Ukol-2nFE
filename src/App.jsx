@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { usePersistentState } from "./usePersistentState";
 import { DEFAULT_DATA } from "./data";
 import ListsPage from "./routes/ListsPage";
+import Layout from "./components/Layout";
 import ListDetailPage from "./routes/ListDetailPage.jsx";
 import "./App.css";
 
@@ -30,22 +31,26 @@ export default function App() {
   if (match) {
     const id = decodeURIComponent(match[1]);
     return (
-      <ListDetailPage
-        state={state}
-        setState={setState}
-        id={id}
-        onBack={() => navigate("/lists")}
-      />
+      <Layout>
+        <ListDetailPage
+          state={state}
+          setState={setState}
+          id={id}
+          onBack={() => navigate("/lists")}
+        />
+      </Layout>
     );
   }
 
   // fallback / přehled
   return (
-    <ListsPage
-      state={state}
-      setState={setState}
-      onOpen={(id) => navigate(`/lists/${id}`)}
-    />
+    <Layout>
+      <ListsPage
+        state={state}
+        setState={setState}
+        onOpen={(id) => navigate(`/lists/${id}`)}
+      />
+    </Layout>
   );
 }
 

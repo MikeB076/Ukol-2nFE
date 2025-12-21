@@ -1,4 +1,5 @@
 import ItemRow from "./ItemRow";
+import { useLanguage } from "../context/LanguageContext";
 
 /**
  * @param {object} p
@@ -9,10 +10,12 @@ import ItemRow from "./ItemRow";
  * @param {boolean} [p.disabled]
  */
 export default function ItemList(p) {
+  const { t } = useLanguage();
+
   if (!p.items.length)
     return (
       <div style={{ color: "#777" }} aria-live="polite">
-        Žádné položky…
+        {t.noItems ?? "No items…"}
       </div>
     );
 

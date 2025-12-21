@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLanguage } from "../context/LanguageContext";
 
 /**
  * @param {{
@@ -11,6 +12,7 @@ import { useState } from "react";
  * }} p
  */
 export default function ItemRow(p) {
+  const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(p.name);
 
@@ -32,8 +34,8 @@ export default function ItemRow(p) {
         type="checkbox"
         checked={p.done}
         onChange={(e) => p.onToggleDone(p.id, e.target.checked)}
-        aria-label={`Označit \"${p.name}\" jako ${p.done ? "ne" : ""}vyřešené`}
-        title={p.done ? "Odznačit jako nevyřešené" : "Označit jako vyřešené"}
+        aria-label={`${t.toggleItem ?? "Toggle item"} \"${p.name}\"`}
+        title={p.done ? (t.markUndone ?? "Mark as not done") : (t.markDone ?? "Mark as done")}
       />
 
       {editing ? (
@@ -45,7 +47,7 @@ export default function ItemRow(p) {
             if (e.key === "Enter") save();
             if (e.key === "Escape") cancel();
           }}
-          aria-label="Upravit název položky"
+          aria-label={t.editItemName ?? "Edit item name"}
           style={{ flex: 1, padding: 6 }}
         />
       ) : (
@@ -57,7 +59,7 @@ export default function ItemRow(p) {
             cursor: "text",
           }}
           onDoubleClick={() => setEditing(true)}
-          title="Dvojklik pro úpravu"
+          title={t.doubleClickToEdit ?? "Double click to edit"}
         >
           {p.name}
         </span>
@@ -65,16 +67,16 @@ export default function ItemRow(p) {
 
       {editing ? (
         <div style={btnGroup}>
-          <button onClick={cancel}>Zrušit</button>
+          <button onClick={cancel}>{t.cancel ?? "Cancel"}</button>
           <button onClick={save} style={primaryBtn} disabled={!value.trim()}>
-            Uložit
+            {t.save ?? "Save"}
           </button>
         </div>
       ) : (
         <div style={btnGroup}>
-          <button onClick={() => setEditing(true)}>Upravit</button>
+          <button onClick={() => setEditing(true)}>{t.edit ?? "Edit"}</button>
           <button onClick={() => p.onRemove(p.id)} style={dangerBtn}>
-            Smazat
+            {t.delete ?? "Delete"}
           </button>
         </div>
       )}

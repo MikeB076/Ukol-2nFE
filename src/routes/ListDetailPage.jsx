@@ -5,6 +5,8 @@ import ItemFilters from "../components/ItemFilters";
 import ItemList from "../components/ItemList";
 import RenameListModal from "../components/RenameListModal";
 import ConfirmDialog from "../components/ConfirmDialog";
+import DetailPieChart from "../components/charts/DetailPieChart";
+import { useLanguage } from "../context/LanguageContext";
 import { fetchListDetail, addItem, updateItem, deleteItem } from "../api/mockApi";
 
 // Pomocné funkce – tenké obaly nad mock API z api/mockApi.js
@@ -46,13 +48,15 @@ export default function ListDetailPage({ state, setState, id, onBack }) {
     });
   };
 
+  const { t } = useLanguage();
+
   const refreshList = async () => {
     try {
       const detail = await apiGetListDetail(id);
       applyUpdatedList(detail);
     } catch (e) {
       console.error(e);
-      alert("Nepodařilo se aktualizovat seznam po změně položek.");
+      alert(t.failedUpdateAfterItems ?? "Nepodařilo se aktualizovat seznam po změně položek.");
     }
   };
 
@@ -83,7 +87,7 @@ export default function ListDetailPage({ state, setState, id, onBack }) {
       } catch (e) {
         if (!cancelled) {
           console.error(e);
-          setError("Nepodařilo se načíst detail seznamu.");
+          setError(t.failedLoadDetail ?? "Nepodařilo se načíst detail seznamu.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -131,22 +135,28 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
   const [renameOpen, setRenameOpen] = useState(false);
   const [confirm, setConfirm] = useState(null); // { text, onConfirm }
 
+  // Odvozené položky podle filtru (zobrazit i vyřešené)
+  const filteredItems = useMemo(() => {
+    const safeItems = Array.isArray(items) ? items : [];
+    return showDone ? safeItems : safeItems.filter((i) => !i.done);
+  }, [items, showDone]);
+
   if (!baseList) {
     return (
       <div className="container">
         <button onClick={onBack} style={{ marginBottom: 12 }}>
-          &larr; Zpět
+          &larr; {t.backToLists ?? "Zpět"}
         </button>
 
         {loading && (
           <div className="alert alert--info">
-            <p>Načítám detail seznamu…</p>
+            <p>{t.loadingListDetail ?? "Načítám detail seznamu…"}</p>
           </div>
         )}
 
         {!loading && (
           <div className="alert alert--error">
-            <p>Seznam nebyl nalezen nebo se ho nepodařilo načíst.</p>
+            <p>{t.listNotFound ?? "Seznam nebyl nalezen nebo se ho nepodařilo načíst."}</p>
             {error && <p className="alert__detail">{error}</p>}
           </div>
         )}
@@ -156,27 +166,27 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
 
   /** -------- Handlery: položky – nyní přes API -------- */
   const handleAddItem = async (payload) => {
-  if (!baseList || baseList.archived) return;
+    if (!baseList || baseList.archived) return;
 
-  // Zkusíme postupně různé názvy polí, podle toho, co posílá ItemNewForm
-  const text = (
-    payload?.name ??
-    payload?.text ??
-    payload?.value ??
-    ""
-  ).trim();
+    // Zkusíme postupně různé názvy polí, podle toho, co posílá ItemNewForm
+    const text = (
+      payload?.name ??
+      payload?.text ??
+      payload?.value ??
+      ""
+    ).trim();
 
-  if (!text) return;
+    if (!text) return;
 
-  try {
-    // apiAddItem očekává objekt s name, tak ho tam zkonvertujeme
-    await apiAddItem(id, { name: text });
-    await refreshList();
-  } catch (e) {
-    console.error(e);
-    alert("Nepodařilo se přidat položku.");
-  }
-};
+    try {
+      // apiAddItem očekává objekt s name, tak ho tam zkonvertujeme
+      await apiAddItem(id, { name: text });
+      await refreshList();
+    } catch (e) {
+      console.error(e);
+      alert(t.failedAddItem ?? "Nepodařilo se přidat položku.");
+    }
+  };
 
   const handleToggleDone = async (itemId, next) => {
     if (!baseList || baseList.archived) return;
@@ -185,7 +195,7 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
       await refreshList();
     } catch (e) {
       console.error(e);
-      alert("Nepodařilo se aktualizovat položku.");
+      alert(t.failedUpdateItem ?? "Nepodařilo se aktualizovat položku.");
     }
   };
 
@@ -198,21 +208,21 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
       await refreshList();
     } catch (e) {
       console.error(e);
-      alert("Nepodařilo se upravit položku.");
+      alert(t.failedEditItem ?? "Nepodařilo se upravit položku.");
     }
   };
 
   const handleRemoveItem = (itemId) => {
     if (!baseList || baseList.archived) return;
     setConfirm({
-      text: "Smazat položku ze seznamu?",
+      text: t.confirmDeleteItem ?? "Smazat položku ze seznamu?",
       onConfirm: async () => {
         try {
           await apiDeleteItem(id, itemId);
           await refreshList();
         } catch (e) {
           console.error(e);
-          alert("Nepodařilo se smazat položku.");
+          alert(t.failedDeleteItem ?? "Nepodařilo se smazat položku.");
         } finally {
           setConfirm(null);
         }
@@ -243,7 +253,7 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
   const handleDeleteList = () => {
     if (!isOwner) return;
     setConfirm({
-      text: "Opravdu smazat tento nákupní seznam?",
+      text: t.confirmDeleteList ?? "Opravdu smazat tento nákupní seznam?",
       onConfirm: () => {
         setState((prev) => ({
           ...prev,
@@ -282,7 +292,7 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
     if (!baseList || !isOwner || baseList.archived) return;
     if (userId === baseList.ownerId) return; // ownera neodstraňuj
     setConfirm({
-      text: "Odebrat člena ze seznamu?",
+      text: t.confirmRemoveMember ?? "Odebrat člena ze seznamu?",
       onConfirm: () => {
         setState((prev) => ({
           ...prev,
@@ -303,7 +313,7 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
   const handleLeave = () => {
     if (!baseList || isOwner || baseList.archived) return; // owner nemůže odejít, ani v archivu
     setConfirm({
-      text: "Opravdu chcete odejít ze seznamu?",
+      text: t.confirmLeaveList ?? "Opravdu chcete odejít ze seznamu?",
       onConfirm: () => {
         setState((prev) => ({
           ...prev,
@@ -328,32 +338,32 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
   };
 
   /** -------- Odvozeniny -------- */
-  const filteredItems = useMemo(
-    () => (showDone ? items : items.filter((i) => !i.done)),
-    [items, showDone]
-  );
-
   const title = baseList.title ?? baseList.name; // pro jistotu podporuj obě pole
 
+  const doneCount = items.reduce((acc, it) => acc + (it.done ? 1 : 0), 0);
+  const totalCount = items.length;
+  const pendingCount = Math.max(0, totalCount - doneCount);
+
   return (
-    <div className="container">
-      <button onClick={onBack} style={{ marginBottom: 12 }}>
-        &larr; Zpět
-      </button>
+    <div className="detail-wrap">
+      <div className="container">
+        <button className="btn btn--ghost btn--back" onClick={onBack}>
+          &larr; {t.backToLists ?? "Zpět"}
+        </button>
 
-      {loading && (
-        <div className="alert alert--info" style={{ marginBottom: 12 }}>
-          <p>Načítám aktuální stav seznamu…</p>
-        </div>
-      )}
+        {loading && (
+          <div className="alert alert--info alert--spaced">
+            <p>{t.loadingList ?? "Načítám aktuální stav seznamu…"}</p>
+          </div>
+        )}
 
-      {error && !loading && (
-        <div className="alert alert--error" style={{ marginBottom: 12 }}>
-          <p>{error}</p>
-        </div>
-      )}
+        {error && !loading && (
+          <div className="alert alert--error alert--spaced">
+            <p>{error}</p>
+          </div>
+        )}
 
-      <div className="card vstack">
+        <div className="card detail-card vstack" style={{ overflow: "visible" }}>
         <ListHeader
           title={title}
           isOwner={isOwner}
@@ -363,6 +373,35 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
           onDelete={handleDeleteList}
           onOpenMembers={onOpenMembers}
         />
+
+        <div className="section detail-stats">
+          {/* Left: KPIs (nicely formatted) */}
+          <div className="detail-stats-panel">
+            <h3 className="detail-section-title">{t.statistics ?? "Statistiky"}</h3>
+
+            <dl className="stats-list">
+              <div className="stats-item">
+                <dt className="label">{t.done ?? "Hotovo"}</dt>
+                <dd className="value">{doneCount}</dd>
+              </div>
+              <div className="stats-item">
+                <dt className="label">{t.pending ?? "Čeká"}</dt>
+                <dd className="value">{pendingCount}</dd>
+              </div>
+              <div className="stats-item">
+                <dt className="label">{t.total ?? "Celkem"}</dt>
+                <dd className="value">{totalCount}</dd>
+              </div>
+            </dl>
+          </div>
+
+          {/* Right: chart in its own box so it won't get cut */}
+          <div className="detail-stats-panel">
+            <div className="chart-box detail-chart" aria-label="Progress chart">
+              <DetailPieChart items={items} itemsCount={totalCount} doneCount={doneCount} />
+            </div>
+          </div>
+        </div>
 
         <div className="section">
           <ItemNewForm onAdd={handleAddItem} disabled={!!baseList.archived} />
@@ -379,7 +418,7 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
         {/* ---- Členové seznamu */}
         {showMembers && (
           <section id="members-section" ref={membersRef} className="section vstack">
-            <h3>Členové</h3>
+            <h3>{t.members ?? "Členové"}</h3>
 
             {/* přidání člena – povoleno jen ownerovi */}
             {isOwner && (
@@ -389,10 +428,10 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
             <table className="table" style={{ marginTop: 8 }}>
               <thead>
                 <tr>
-                  <th scope="col">Uživatel</th>
-                  <th scope="col">Role</th>
+                  <th scope="col">{t.user ?? "Uživatel"}</th>
+                  <th scope="col">{t.role ?? "Role"}</th>
                   <th scope="col" style={{ width: 200 }}>
-                    Akce
+                    {t.action ?? "Akce"}
                   </th>
                 </tr>
               </thead>
@@ -415,7 +454,7 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
                             disabled={!!baseList.archived}
                             onClick={() => handleRemoveMember(m.id)}
                           >
-                            Odebrat
+                            {t.remove ?? "Odebrat"}
                           </button>
                         )}
                         {!isOwner && isCurrent && (
@@ -425,7 +464,7 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
                             disabled={!!baseList.archived}
                             onClick={handleLeave}
                           >
-                            Odejít
+                            {t.leave ?? "Odejít"}
                           </button>
                         )}
                       </td>
@@ -438,21 +477,22 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
         )}
       </div>
 
-      {/* Modaly */}
-      <RenameListModal
-        isOpen={renameOpen}
-        onClose={() => setRenameOpen(false)}
-        onSubmit={handleRename}
-        defaultValue={title}
-      />
-      <ConfirmDialog
-        isOpen={!!confirm}
-        text={confirm?.text ?? ""}
-        onConfirm={() => {
-          confirm?.onConfirm?.();
-        }}
-        onCancel={() => setConfirm(null)}
-      />
+        {/* Modaly */}
+        <RenameListModal
+          isOpen={renameOpen}
+          onClose={() => setRenameOpen(false)}
+          onSubmit={handleRename}
+          defaultValue={title}
+        />
+        <ConfirmDialog
+          isOpen={!!confirm}
+          text={confirm?.text ?? ""}
+          onConfirm={() => {
+            confirm?.onConfirm?.();
+          }}
+          onCancel={() => setConfirm(null)}
+        />
+      </div>
     </div>
   );
 }
@@ -460,11 +500,12 @@ const members = Array.isArray(baseList?.members) ? baseList.members : [];
 /** Jednoduchý inline formulář  */
 function InlineInvite({ onInvite, disabled }) {
   const [v, setV] = useState("");
+  const { t } = useLanguage();
   return (
     <div className="input-group">
       <input
         className="input"
-        placeholder="E-mail / jméno"
+        placeholder={t.emailOrName ?? "E-mail / jméno"}
         value={v}
         disabled={disabled}
         onChange={(e) => setV(e.target.value)}
@@ -477,7 +518,7 @@ function InlineInvite({ onInvite, disabled }) {
           setV("");
         }}
       >
-        Pozvat
+        {t.invite ?? "Pozvat"}
       </button>
     </div>
   );

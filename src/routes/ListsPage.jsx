@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { fetchListsOverview, createList, deleteList } from "../api/mockApi";
+import ListSummary from "../components/charts/ListSummary";
+import { useLanguage } from "../context/LanguageContext";
 
 /** Fallback otevření detailu jedním reloadem, pokud není předán onOpen */
 function openList(id) {
@@ -20,6 +22,8 @@ export default function ListsPage({ state, setState, onOpen }) {
   const [scope, setScope] = useState("all"); // all | owned | member
   const [createOpen, setCreateOpen] = useState(false);
   const [confirm, setConfirm] = useState(null); // {text, onConfirm}
+
+  const { t, language } = useLanguage();
 
   // Načtení seznamů z mock "serveru"
   useEffect(() => {
@@ -60,10 +64,7 @@ export default function ListsPage({ state, setState, onOpen }) {
     [cleanLists, currentUserId]
   );
 
-  const archivedCount = useMemo(
-    () => cleanLists.filter((l) => l.archived).length,
-    [cleanLists]
-  );
+  const archivedCount = useMemo(() => cleanLists.filter((l) => l.archived).length, [cleanLists]);
 
   const canDelete = (list) => list.ownerId === currentUserId;
 
@@ -76,11 +77,13 @@ export default function ListsPage({ state, setState, onOpen }) {
     const list = lists.find((l) => l.id === id);
     if (!list || !canDelete(list)) return;
     setConfirm({
-      text: `Opravdu smazat seznam „${list.name}“?`,
+      text:
+        language === "cs"
+          ? `Opravdu smazat seznam „${list.name}“?`
+          : `Delete the list “${list.name}”?`,
       onConfirm: async () => {
         try {
           await deleteList(id);
-          // po úspěšném smazání načteme přehled z mock API
           const updated = await fetchListsOverview();
           setState((prev) => ({
             ...prev,
@@ -88,7 +91,11 @@ export default function ListsPage({ state, setState, onOpen }) {
           }));
         } catch (e) {
           console.error("Chyba při mazání seznamu:", e);
-          alert("Seznam se nepodařilo smazat. Zkuste to prosím znovu.");
+          alert(
+            language === "cs"
+              ? "Seznam se nepodařilo smazat. Zkuste to prosím znovu."
+              : "Failed to delete the list. Please try again."
+          );
         } finally {
           setConfirm(null);
         }
@@ -97,71 +104,55 @@ export default function ListsPage({ state, setState, onOpen }) {
   };
 
   const handleCreate = async (payload) => {
-  console.log("handleCreate called with payload:", payload); // DEBUG
+    const name = (payload?.name || "").trim();
+    if (!name) return;
 
-  const name = (payload?.name || "").trim();
-  if (!name) return;
+    try {
+      const result = await createList(name, currentUserId);
 
-  try {
-    // 1) zavoláme mock API
-    const result = await createList(name, currentUserId);
-    console.log("createList result:", result); // DEBUG
+      let nextLists = null;
 
-    let nextLists = null;
-
-    // a) API nám vrátí rovnou CELÝ přehled seznamů
-    if (Array.isArray(result)) {
-      nextLists = result;
-    }
-    // b) API vrátí jen NOVÝ seznam (objekt)
-    else if (result && typeof result === "object") {
-      setState((prev) => {
-        const base = Array.isArray(prev.lists) ? prev.lists.filter(Boolean) : [];
-        const idx = base.findIndex((l) => l.id === result.id);
-        if (idx >= 0) {
-          base[idx] = result;
-        } else {
-          base.unshift(result);
-        }
-        console.log("lists after merge:", base); // DEBUG
-        return { ...prev, lists: base };
-      });
-    }
-
-    // c) Pokud jsme zatím `nextLists` neurčili, zkusíme načíst přehled znovu z API
-    if (!nextLists) {
-      const updated = await fetchListsOverview();
-      console.log("fetchListsOverview after create:", updated); // DEBUG
-      if (Array.isArray(updated)) {
-        nextLists = updated;
+      if (Array.isArray(result)) {
+        nextLists = result;
+      } else if (result && typeof result === "object") {
+        setState((prev) => {
+          const base = Array.isArray(prev.lists) ? prev.lists.filter(Boolean) : [];
+          const idx = base.findIndex((l) => l.id === result.id);
+          if (idx >= 0) base[idx] = result;
+          else base.unshift(result);
+          return { ...prev, lists: base };
+        });
       }
+
+      if (!nextLists) {
+        const updated = await fetchListsOverview();
+        if (Array.isArray(updated)) nextLists = updated;
+      }
+
+      if (Array.isArray(nextLists)) {
+        setState((prev) => ({
+          ...prev,
+          lists: nextLists.filter(Boolean),
+        }));
+      }
+
+      setCreateOpen(false);
+    } catch (e) {
+      console.error("Chyba při vytváření seznamu:", e);
+      alert(
+        language === "cs"
+          ? "Seznam se nepodařilo vytvořit. Zkuste to prosím znovu."
+          : "Failed to create the list. Please try again."
+      );
     }
-
-    // d) Pokud máme nextLists jako pole, uložíme ho do globálního stavu
-    if (Array.isArray(nextLists)) {
-      setState((prev) => ({
-        ...prev,
-        lists: nextLists.filter(Boolean),
-      }));
-    }
-
-    setCreateOpen(false);
-  } catch (e) {
-    console.error("Chyba při vytváření seznamu:", e);
-    alert("Seznam se nepodařilo vytvořit. Zkuste to prosím znovu.");
-  }
-};
-
-  // ----- RENDER PODLE STAVU -----
+  };
 
   if (status === "pending") {
     return (
       <div style={{ maxWidth: 980, margin: "32px auto", padding: "0 16px" }}>
         <div className="alert alert--info">
-          <p>Načítám nákupní seznamy…</p>
-          <p className="alert__detail">
-            Prosím čekejte, data se načítají z mock serveru.
-          </p>
+          <p>{t.loadingLists ?? (language === "cs" ? "Načítám nákupní seznamy…" : "Loading shopping lists…")}</p>
+          <p className="alert__detail">{t.loadingListsDetail ?? (language === "cs" ? "Prosím čekejte, data se načítají z mock serveru." : "Please wait, data is being loaded from the mock server.")}</p>
         </div>
       </div>
     );
@@ -171,19 +162,15 @@ export default function ListsPage({ state, setState, onOpen }) {
     return (
       <div style={{ maxWidth: 980, margin: "32px auto", padding: "0 16px" }}>
         <div className="alert alert--error">
-          <p>Nepodařilo se načíst nákupní seznamy.</p>
-          <p className="alert__detail">
-            Zkuste to prosím znovu později nebo obnovte stránku.
-          </p>
+          <p>{t.failedLoadLists ?? (language === "cs" ? "Nepodařilo se načíst nákupní seznamy." : "Failed to load shopping lists.")}</p>
+          <p className="alert__detail">{t.failedLoadListsDetail ?? (language === "cs" ? "Zkuste to prosím znovu později nebo obnovte stránku." : "Please try again later or refresh the page.")}</p>
         </div>
       </div>
     );
   }
 
-  /** UI pro ready stav */
   return (
     <div style={{ maxWidth: 980, margin: "32px auto", padding: "0 16px" }}>
-      {/* Hero */}
       <header
         style={{
           display: "flex",
@@ -194,22 +181,18 @@ export default function ListsPage({ state, setState, onOpen }) {
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: 26 }}>Moje nákupní seznamy</h1>
+          <h1 style={{ margin: 0, fontSize: 26 }}>{t.shoppingLists}</h1>
           <p style={{ margin: "6px 0 0", opacity: 0.7, fontSize: 14 }}>
-            Spravuj seznamy, sdílej s členy a sleduj progres.
+            {t.tagline || "Spravuj seznamy, sdílej s členy a sleduj progres."}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            className="btn btn--primary"
-            onClick={() => setCreateOpen(true)}
-          >
-            + Nový seznam
+          <button className="btn btn--primary" onClick={() => setCreateOpen(true)}>
+            + {t.newList ? t.newList : "Nový seznam"}
           </button>
         </div>
       </header>
 
-      {/* Quick stats */}
       <ul
         style={{
           display: "flex",
@@ -220,31 +203,23 @@ export default function ListsPage({ state, setState, onOpen }) {
         }}
       >
         <li>
-          Celkem:{" "}
-          <strong style={{ color: "var(--text, #fff)" }}>{cleanLists.length}</strong>
+          {t.allLists}: <strong style={{ color: "var(--text, #fff)" }}>{cleanLists.length}</strong>
         </li>
         <li>
-          Moje:{" "}
+          {(t.myListsLabel ?? t.mine ?? (language === "cs" ? "Moje" : "Mine"))}:{" "}
           <strong style={{ color: "var(--text, #fff)" }}>{myListsCount}</strong>
         </li>
         <li>
-          Archiv:{" "}
-          <strong style={{ color: "var(--text, #fff)" }}>
-            {archivedCount}
-          </strong>
+          {(t.archiveLabel ?? t.archived ?? (language === "cs" ? "Archiv" : "Archive"))}:{" "}
+          <strong style={{ color: "var(--text, #fff)" }}>{archivedCount}</strong>
         </li>
       </ul>
 
-      {/* Toolbar s filtry (pills) */}
       <div style={toolbarStyle}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {["all", "owned", "member"].map((key) => (
-            <button
-              key={key}
-              onClick={() => setScope(key)}
-              style={pillStyle(scope === key)}
-            >
-              {key === "all" ? "Vše" : key === "owned" ? "Jen moje" : "Sdílené"}
+            <button key={key} onClick={() => setScope(key)} style={pillStyle(scope === key)}>
+              {key === "all" ? (t.all ?? (language === "cs" ? "Vše" : "All")) : key === "owned" ? (t.mine ?? (language === "cs" ? "Jen moje" : "Mine")) : (t.shared ?? (language === "cs" ? "Sdílené" : "Shared"))}
             </button>
           ))}
         </div>
@@ -257,54 +232,57 @@ export default function ListsPage({ state, setState, onOpen }) {
             marginLeft: "auto",
           }}
         >
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(e) => setShowArchived(e.target.checked)}
-          />
-          Zobrazit archivované
+          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+          {t.showArchived ?? (language === "cs" ? "Zobrazit archivované" : "Show archived")}
         </label>
       </div>
 
-      {/* Grid */}
       <TilesGrid>
-        {filtered.map((l) => (
-          <ListTile
-            key={l.id}
-            name={l.name}
-            owner={l.ownerId === currentUserId ? "Ty" : l.ownerId}
-            itemsCount={l.itemsCount}
-            doneCount={l.doneCount}
-            archived={l.archived}
-            onOpen={() => handleOpen(l.id)}
-            onDelete={canDelete(l) ? () => handleDelete(l.id) : null}
-          />
-        ))}
+        {filtered.map((l) => {
+          const rawItemsCount =
+            l.itemsCount ?? l.totalCount ?? l.items_total ?? l.totalItems ?? l.items?.length ?? 0;
+
+          const rawDoneCount =
+            l.doneCount ??
+            l.doneItemsCount ??
+            l.completedCount ??
+            l.items_done ??
+            l.doneItems ??
+            (Array.isArray(l.items) ? l.items.filter((it) => it?.done).length : 0) ??
+            0;
+
+          const itemsCount = Number.isFinite(Number(rawItemsCount)) ? Number(rawItemsCount) : 0;
+          const doneCount = Number.isFinite(Number(rawDoneCount)) ? Number(rawDoneCount) : 0;
+
+          return (
+            <ListTile
+              key={l.id}
+              name={l.name}
+              owner={l.ownerId === currentUserId ? (language === "cs" ? "Ty" : "You") : l.ownerId}
+              itemsCount={itemsCount}
+              doneCount={doneCount}
+              archived={l.archived}
+              onOpen={() => handleOpen(l.id)}
+              onDelete={canDelete(l) ? () => handleDelete(l.id) : null}
+            />
+          );
+        })}
+
         {filtered.length === 0 && (
           <div style={emptyStyle} className="card">
-            <h3 style={{ margin: "0 0 6px" }}>Žádné seznamy</h3>
-            <p style={{ margin: 0, opacity: 0.7 }}>
-              Změň filtr nebo založ nový seznam.
-            </p>
+            <h3 style={{ margin: "0 0 6px" }}>{t.noListsYet}</h3>
+            <p style={{ margin: 0, opacity: 0.7 }}>{t.createFirstList || "Změň filtr nebo založ nový seznam."}</p>
             <div style={{ marginTop: 12 }}>
-              <button
-                className="btn btn--primary"
-                onClick={() => setCreateOpen(true)}
-              >
-                Vytvořit první seznam
+              <button className="btn btn--primary" onClick={() => setCreateOpen(true)}>
+                {t.createFirstList}
               </button>
             </div>
           </div>
         )}
       </TilesGrid>
 
-      {/* Modaly & potvrzení */}
       {createOpen && (
-        <CreateListModal
-          isOpen={createOpen}
-          onClose={() => setCreateOpen(false)}
-          onCreate={handleCreate}
-        />
+        <CreateListModal isOpen={createOpen} onClose={() => setCreateOpen(false)} onCreate={handleCreate} />
       )}
 
       <ConfirmDialog
@@ -317,7 +295,6 @@ export default function ListsPage({ state, setState, onOpen }) {
   );
 }
 
-/** --- Grid wrapper */
 function TilesGrid({ children }) {
   return (
     <div
@@ -333,20 +310,9 @@ function TilesGrid({ children }) {
   );
 }
 
-/** --- Jedna dlaždice s avatarem a progresem */
-function ListTile({
-  name,
-  owner,
-  itemsCount,
-  doneCount,
-  archived,
-  onOpen,
-  onDelete,
-}) {
+function ListTile({ name, owner, itemsCount, doneCount, archived, onOpen, onDelete }) {
   const first = (name?.[0] || "S").toUpperCase();
-  const ratio = itemsCount
-    ? Math.min(100, Math.round((doneCount / itemsCount) * 100))
-    : 0;
+  const { t, language } = useLanguage();
 
   return (
     <article style={tileStyle} className="tile tile--accent">
@@ -365,43 +331,27 @@ function ListTile({
             {name}
           </h3>
           <div style={{ opacity: 0.75, fontSize: 13, marginTop: 2 }}>
-            Owner: {owner}
+            {(t.ownerLabel ?? "Owner")}: {owner}
           </div>
         </div>
-        {archived && <span style={badgeStyle}>ARCHIV</span>}
+        {archived && (
+          <span style={badgeStyle}>
+            {t.archived ?? (language === "cs" ? "ARCHIV" : "ARCHIVED")}
+          </span>
+        )}
       </div>
 
       <div style={{ marginTop: 10 }}>
-        <div style={progressTrackStyle}>
-          <div style={{ ...progressBarStyle, width: `${ratio}%` }} />
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginTop: 4,
-            fontSize: 12,
-            opacity: 0.8,
-          }}
-        >
-          <span>
-            Hotovo {doneCount}/{itemsCount}
-          </span>
-          <span>{ratio}%</span>
-        </div>
+        <ListSummary itemsCount={itemsCount} doneCount={doneCount} />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      <div className="tile-actions" style={{ marginTop: 12, display: "flex", gap: 8 }}>
         <button className="btn btn--ghost" onClick={onOpen}>
-          Otevřít
+          {t.open ? t.open : "Otevřít"}
         </button>
         {onDelete && (
-          <button
-            className="btn btn--danger"
-            style={{ marginLeft: "auto" }}
-            onClick={onDelete}
-          >
-            Smazat
+          <button className="btn btn--danger" style={{ marginLeft: "auto" }} onClick={onDelete}>
+            {t.delete ? t.delete : "Smazat"}
           </button>
         )}
       </div>
@@ -409,29 +359,25 @@ function ListTile({
   );
 }
 
-/** --- Modal pro vytvoření nového seznamu */
 function CreateListModal({ isOpen, onClose, onCreate }) {
   const [v, setV] = useState("");
+  const { t, language } = useLanguage();
 
   if (!isOpen) return null;
   return (
     <div style={modalBackdropStyle}>
       <div style={modalStyle}>
-        <h3 style={{ marginTop: 0 }}>Nový seznam</h3>
+        <h3 style={{ marginTop: 0 }}>{t.newList ?? (language === "cs" ? "Nový seznam" : "New list")}</h3>
         <input
-          placeholder="Název seznamu"
+          placeholder={t.listNamePlaceholder ?? (language === "cs" ? "Název seznamu" : "List name")}
           value={v}
           onChange={(e) => setV(e.target.value)}
           style={{ width: "100%" }}
         />
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button onClick={onClose}>Zrušit</button>
-          <button
-            style={{ marginLeft: "auto" }}
-            disabled={!v.trim()}
-            onClick={() => onCreate({ name: v })}
-          >
-            Vytvořit
+          <button onClick={onClose}>{t.cancel ?? (language === "cs" ? "Zrušit" : "Cancel")}</button>
+          <button style={{ marginLeft: "auto" }} disabled={!v.trim()} onClick={() => onCreate({ name: v })}>
+            {t.create ?? (language === "cs" ? "Vytvořit" : "Create")}
           </button>
         </div>
       </div>
@@ -439,7 +385,6 @@ function CreateListModal({ isOpen, onClose, onCreate }) {
   );
 }
 
-/** --- Stylové objekty (inline kvůli jednoduché integrace) */
 const toolbarStyle = {
   position: "sticky",
   top: 0,
@@ -452,9 +397,9 @@ const toolbarStyle = {
 };
 
 const pillStyle = (active) => ({
-  border: "1px solid var(--border, #2c2c2c)",
-  background: active ? "rgba(79,140,255,.15)" : "#141414",
-  color: "var(--text, #fff)",
+  border: "1px solid var(--border)",
+  background: active ? "rgba(79,140,255,.15)" : "transparent",
+  color: active ? "var(--primary)" : "var(--text)",
   padding: ".4rem .7rem",
   borderRadius: 999,
   cursor: "pointer",
@@ -472,20 +417,20 @@ const emptyStyle = {
 };
 
 const tileStyle = {
-  border: "1px solid #2c2c2c",
-  borderRadius: 12,
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius)",
   padding: 14,
-  background: "#111",
+  background: "var(--card)",
   position: "relative",
   overflow: "hidden",
+  boxShadow: "var(--shadow)",
 };
 
 const avatarStyle = {
   width: 36,
   height: 36,
   borderRadius: "50%",
-  background:
-    "linear-gradient(135deg, rgba(79,140,255,.35), rgba(79,140,255,.15))",
+  background: "linear-gradient(135deg, rgba(79,140,255,.35), rgba(79,140,255,.15))",
   display: "grid",
   placeItems: "center",
   fontWeight: 700,
@@ -497,19 +442,6 @@ const badgeStyle = {
   borderRadius: 999,
   background: "#333",
   letterSpacing: ".06em",
-};
-
-const progressTrackStyle = {
-  height: 8,
-  background: "#1a1a1a",
-  borderRadius: 999,
-  overflow: "hidden",
-  border: "1px solid #242424",
-};
-
-const progressBarStyle = {
-  height: "100%",
-  background: "linear-gradient(90deg, #4f8cff, #53e68a)",
 };
 
 const modalBackdropStyle = {
