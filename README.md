@@ -1,42 +1,63 @@
-###🛒 Domácí úkol FE #2 – Seznamy nákupů
+# 🛒 Domácí úkol – Seznamy nákupů
 
-Autor: Michal Bezpalec
-Technologie: React + Vite (frontend) + jednoduchá API logika ve složce /api
+**Autor:** Michal Bezpalec  
+**Technologie:**  
+- Frontend: React + Vite  
+- Backend: jednoduchá API logika (Node.js / Express) ve složce `/api`
 
-📁 Struktura projektu
+---
 
-/api/
+## 📌 Popis projektu
+
+Projekt představuje jednoduchou aplikaci pro správu **nákupních seznamů**.  
+Uživatel může vytvářet, upravovat, mazat a archivovat seznamy, pracovat s položkami a spravovat členy seznamu.
+
+Aplikace je rozdělena na **frontendovou část** (React) a **jednoduchou backendovou logiku**, která běží pouze lokálně a slouží pro účely cvičení (nejde o produkční backend).
+
+---
+
+## 📁 Struktura projektu
+
+### `/api/`
 
 Obsahuje implementaci základní backendové logiky využívané v rámci úkolu:
-	•	mock endpointy pro práci se seznamy,
-	•	mazání položek,
-	•	archivace,
-	•	úprava názvu,
-	•	správa členů,
-	•	validace.
 
-Celá logika běží pouze lokálně v rámci vývojového serveru (není to skutečný backend).
+- mock endpointy pro práci se seznamy nákupů,
+- vytváření, úprava a mazání seznamů,
+- archivace seznamů,
+- práce s položkami,
+- správa členů seznamu,
+- validace vstupních dat,
+- middleware (autentizace, role, validace).
 
-⸻
+Celá API logika běží **pouze lokálně v rámci vývojového serveru** a slouží k simulaci backendu pro frontendovou aplikaci.
 
-/src/
+Součástí projektu jsou také **unit testy** implementované pomocí Jest a Supertest.
 
-Hlavní část frontend aplikace:
-	•	React komponenty,
-	•	stránky (routes),
-	•	stylování (App.css),
-	•	persistentní stav (usePersistentState),
-	•	UI logika (modály, seznamy, filtry).
+---
 
-Struktura je rozdělená do složek:
-	•	components/ – znovupoužitelné UI bloky
-	•	routes/ – jednotlivé stránky (ListsPage, ListDetailPage)
-	•	assets/ – případná grafika
-	•	validators/ – kontrola dat
-	•	mw/ – middlewares nad API (role, validace)
+### `/src/`
 
- ### Spuštění buildu
- npx serve -s . -l 5173
- 
- ### Aplikace se spustí na:
-👉 http://localhost:5173
+Hlavní část frontendové aplikace postavené v Reactu:
+
+- React komponenty,
+- jednotlivé stránky aplikace (routes),
+- stylování (`App.css`),
+- persistentní stav (`usePersistentState`),
+- UI logika (modály, seznamy, filtry).
+
+Struktura je rozdělena do přehledných složek:
+
+- `components/` – znovupoužitelné UI komponenty  
+- `routes/` – jednotlivé stránky aplikace (`ListsPage`, `ListDetailPage`)  
+- `assets/` – statické soubory a grafika  
+- `validators/` – validace dat  
+- `mw/` – middleware nad API (role, validace)
+
+---
+
+## ▶️ Spuštění aplikace
+
+### Build a spuštění projektu
+```bash
+npx serve -s . -l 5173
