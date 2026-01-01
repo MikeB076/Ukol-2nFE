@@ -183,7 +183,7 @@ export default function ListsPage({ state, setState, onOpen }) {
         <div>
           <h1 style={{ margin: 0, fontSize: 26 }}>{t.shoppingLists}</h1>
           <p style={{ margin: "6px 0 0", opacity: 0.7, fontSize: 14 }}>
-            {t.tagline || "Spravuj seznamy, sdílej s členy a sleduj progres."}
+            {t.shoppingListsDesc ?? (language === "cs" ? "Spravuj seznamy, sdílej s členy a sleduj progres." : "Manage lists, share with members and track progress.")}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

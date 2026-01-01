@@ -4,6 +4,7 @@ const translations = {
   en: {
     appTitle: 'Shopping Lists',
     shoppingLists: 'Shopping Lists',
+    shoppingListsDesc: 'Manage lists, share with members and track progress.',
     allLists: 'All Lists',
     totalItems: 'Total Items',
     items: 'items',
@@ -80,6 +81,7 @@ const translations = {
   cs: {
     appTitle: 'Nákupní seznamy',
     shoppingLists: 'Nákupní seznamy',
+    shoppingListsDesc: 'Spravuj seznamy, sdílej s členy a sleduj progres.',
     allLists: 'Všechny seznamy',
     totalItems: 'Celkem položek',
     items: 'položek',
