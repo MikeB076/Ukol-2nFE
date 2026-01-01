@@ -59,5 +59,4 @@ Struktura je rozdělena do přehledných složek:
 ## ▶️ Spuštění aplikace
 
 ### Build a spuštění projektu
-```bash
-npx serve -s . -l 5173
+npm run dev
